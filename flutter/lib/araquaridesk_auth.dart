@@ -112,6 +112,10 @@ class AraquariDeskAuth extends ChangeNotifier {
       _admins.clear();
       setupRequired = true;
     }
+    final requestedUser = Platform.environment['ARAQUARIDESK_ADMIN_USER'];
+    if (requestedUser != null && requestedUser.trim().isNotEmpty) {
+      activateSession(requestedUser.trim());
+    }
     notifyListeners();
   }
 
@@ -163,6 +167,11 @@ class AraquariDeskAuth extends ChangeNotifier {
       if (admin.username.toLowerCase() == normalized) return admin;
     }
     return null;
+  }
+
+  void activateSession(String username) {
+    currentAdmin = _find(username);
+    notifyListeners();
   }
 
   Future<bool> setupMaster({
