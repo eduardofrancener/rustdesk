@@ -169,8 +169,17 @@ class AraquariDeskAuth extends ChangeNotifier {
     return null;
   }
 
-  void activateSession(String username) {
-    currentAdmin = _find(username);
+  AraquariAdminAccount? _findByDisplayName(String displayName) {
+    final normalized = displayName.trim().toLowerCase();
+    for (final admin in _admins) {
+      if (admin.displayName.toLowerCase() == normalized) return admin;
+    }
+    return null;
+  }
+
+  void activateSession(String usernameOrDisplayName) {
+    currentAdmin =
+        _find(usernameOrDisplayName) ?? _findByDisplayName(usernameOrDisplayName);
     notifyListeners();
   }
 
@@ -238,11 +247,15 @@ class AraquariDeskAuth extends ChangeNotifier {
     await initialize();
     if (!isAdmin) return false;
     final normalized = username.trim();
+    final normalizedDisplay = displayName.trim();
     if (normalized.isEmpty || normalized.toLowerCase() == 'admin') return false;
-    if (_find(normalized) != null) return false;
+    if (normalizedDisplay.isEmpty) return false;
+    if (_find(normalized) != null || _findByDisplayName(normalizedDisplay) != null) {
+      return false;
+    }
     _admins.add(_createAccount(
       username: normalized,
-      displayName: displayName,
+      displayName: normalizedDisplay,
       password: password,
       permissions: const ['connect', 'view_peers'],
     ));
@@ -255,8 +268,11 @@ class AraquariDeskAuth extends ChangeNotifier {
       String username, String displayName) async {
     if (!isAdmin) return false;
     final account = _find(username);
-    if (account == null || displayName.trim().isEmpty) return false;
-    account.displayName = displayName.trim();
+    final normalizedDisplay = displayName.trim();
+    if (account == null || normalizedDisplay.isEmpty) return false;
+    final existing = _findByDisplayName(normalizedDisplay);
+    if (existing != null && existing.username != account.username) return false;
+    account.displayName = normalizedDisplay;
     await _save();
     notifyListeners();
     return true;
