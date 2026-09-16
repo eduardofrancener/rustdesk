@@ -178,6 +178,7 @@ class AraquariDeskAuth extends ChangeNotifier {
       permissions: const ['connect', 'view_peers', 'manage_users'],
     );
     _admins.add(account);
+    currentAdmin = account;
     setupRequired = false;
     await _save();
     notifyListeners();
