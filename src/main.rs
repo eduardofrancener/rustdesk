@@ -41,10 +41,16 @@ fn configure_araquaridesk() {
     // The existing RustDesk connection handshake already sends the local
     // `display-name` as LoginRequest.my_name. Keep the authenticated TI name in
     // the local config for the lifetime of the admin process and clear it for the
-    // common-user process.
+    // common-user process. The same name is exposed to Flutter through the process
+    // environment so the UI can restore the authenticated role after the restart.
     let display_name = std::env::args()
         .find_map(|arg| arg.strip_prefix("--araquari-display-name=").map(str::to_owned))
         .unwrap_or_default();
+    if is_admin {
+        std::env::set_var("ARAQUARIDESK_ADMIN_USER", &display_name);
+    } else {
+        std::env::remove_var("ARAQUARIDESK_ADMIN_USER");
+    }
     hbb_common::config::LocalConfig::set_option(
         "display-name".to_owned(),
         if is_admin { display_name } else { String::new() },
