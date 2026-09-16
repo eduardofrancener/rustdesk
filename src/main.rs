@@ -21,6 +21,34 @@ fn configure_araquaridesk() {
         "key".to_owned(),
         "11CvwLZ0myJrVOg2amrOhqcKC0gZD1XIiFyL6QBnt+0=".to_owned(),
     );
+
+    // AraquariDesk starts in the safe, incoming-only profile. The authenticated
+    // TI launcher restarts the executable with --araquari-admin after a successful
+    // local login, which switches the Rust connection policy to bidirectional.
+    let is_admin = std::env::args().any(|arg| arg == "--araquari-admin");
+    {
+        let mut hard_settings = hbb_common::config::HARD_SETTINGS.write().unwrap();
+        hard_settings.insert(
+            "conn-type".to_owned(),
+            if is_admin {
+                "bidirectional".to_owned()
+            } else {
+                "incoming".to_owned()
+            },
+        );
+    }
+
+    // The existing RustDesk connection handshake already sends the local
+    // `display-name` as LoginRequest.my_name. Keep the authenticated TI name in
+    // the local config for the lifetime of the admin process and clear it for the
+    // common-user process.
+    let display_name = std::env::args()
+        .find_map(|arg| arg.strip_prefix("--araquari-display-name=").map(str::to_owned))
+        .unwrap_or_default();
+    hbb_common::config::LocalConfig::set_option(
+        "display-name".to_owned(),
+        if is_admin { display_name } else { String::new() },
+    );
 }
 
 #[cfg(any(target_os = "android", target_os = "ios", feature = "flutter"))]
