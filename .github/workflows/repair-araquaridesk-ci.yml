@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   repair:
@@ -44,10 +45,18 @@ jobs:
         run: |
           if git diff --quiet; then
             echo 'No changes needed.'
-            exit 0
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add flutter/lib/desktop/pages/desktop_tab_page.dart
+            git commit -m 'fix: repair AraquariDesk Flutter auth UI compile errors'
+            git push origin HEAD:${GITHUB_REF_NAME}
           fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add flutter/lib/desktop/pages/desktop_tab_page.dart
-          git commit -m 'fix: repair AraquariDesk Flutter auth UI compile errors'
-          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Trigger Full Flutter CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh workflow run 'Full Flutter CI' --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+          echo "Full Flutter CI queued for ${GITHUB_REF_NAME}."
