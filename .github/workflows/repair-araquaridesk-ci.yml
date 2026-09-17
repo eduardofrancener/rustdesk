@@ -2,6 +2,9 @@ name: Repair AraquariDesk CI
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - araquaridesk-branding
 
 permissions:
   contents: write
@@ -27,18 +30,26 @@ jobs:
 
           bad = "    if (result == true && mounted) setState(() {});"
           count = text.count(bad)
-          if count != 2:
-              raise SystemExit(f'Expected 2 invalid mounted/setState lines, found {count}')
-          text = text.replace(bad, "    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.")
+          if count == 2:
+              text = text.replace(
+                  bad,
+                  "    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns."
+              )
+              print('Removed 2 invalid mounted/setState calls.')
+          elif count == 0:
+              print('The mounted/setState errors are already fixed.')
+          else:
+              raise SystemExit(f'Unexpected number of invalid mounted/setState lines: {count}')
 
           old_setup = """    usernameController.dispose();\n    displayController.dispose();\n    passwordController.dispose();\n    confirmController.dispose();\n\n    if (result == true) {\n      final account = auth.currentAdmin;\n      final displayName = account?.displayName ?? 'Administrador';\n      if (isSetup) {\n        final account = await auth.login('admin', passwordController.text);\n        if (account == null) return;\n      }\n      await _restartProcess(\n        admin: true,\n        displayName: displayName,\n      );\n"""
           new_setup = """    usernameController.dispose();\n    displayController.dispose();\n    passwordController.dispose();\n    confirmController.dispose();\n\n    if (result == true) {\n      final account = auth.currentAdmin;\n      final displayName = account?.displayName ?? 'Administrador';\n      await _restartProcess(\n        admin: true,\n        displayName: displayName,\n      );\n"""
-          if old_setup not in text:
-              raise SystemExit('Expected setup/login block was not found')
-          text = text.replace(old_setup, new_setup, 1)
+          if old_setup in text:
+              text = text.replace(old_setup, new_setup, 1)
+              print('Fixed setup/login flow to avoid using a disposed password controller.')
+          else:
+              print('The setup/login flow is already fixed.')
 
           path.write_text(text, encoding='utf-8')
-          print(f'Patched {path}: removed {count} invalid mounted/setState calls and fixed setup login flow.')
 
       - name: Commit and push repair
         shell: bash
