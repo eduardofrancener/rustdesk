@@ -374,7 +374,7 @@ class _RoleAccessButton extends StatelessWidget {
                       : () async {
                           setState(() => busy = true);
                           final password = passwordController.text;
-                          if (password.length < 10) {
+                          if (password.length < 8) {
                             setState(() {
                               busy = false;
                               error = 'Use uma senha com pelo menos 10 caracteres.';
@@ -553,7 +553,7 @@ class _RoleAccessButton extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
           FilledButton(
             onPressed: () async {
-              if (password.text.length < 10 || password.text != confirm.text) return;
+              if (password.text.length < 8 || password.text != confirm.text) return;
               final ok = await auth.addAdmin(
                 username: user.text,
                 password: password.text,
@@ -595,7 +595,7 @@ class _RoleAccessButton extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
           FilledButton(
             onPressed: () async {
-              if (password.text.length < 10 || password.text != confirm.text) return;
+              if (password.text.length < 8 || password.text != confirm.text) return;
               final ok = await auth.changePassword(username, password.text);
               if (ok && dialogContext.mounted) Navigator.pop(dialogContext, true);
             },

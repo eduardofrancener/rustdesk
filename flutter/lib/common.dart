@@ -9,6 +9,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/araquaridesk_auth.dart';
 import 'package:flutter_hbb/desktop/widgets/refresh_wrapper.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/main.dart';
@@ -2571,6 +2572,11 @@ connectMainDesktop(String id,
 /// If [isRDP], starts a session only for rdp.
 connect(BuildContext context, String id,
     {bool isFileTransfer = false,
+  if (isDesktop && desktopType == DesktopType.main &&
+      !AraquariDeskAuth.instance.isAdmin) {
+    showToast(translate('Acesso disponível apenas para TI.'));
+    return;
+  }
     bool isViewCamera = false,
     bool isTerminal = false,
     bool isTcpTunneling = false,
