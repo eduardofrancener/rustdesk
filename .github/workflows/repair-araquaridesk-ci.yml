@@ -1,0 +1,53 @@
+name: Repair AraquariDesk CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Patch AraquariDesk Flutter compile errors
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('flutter/lib/desktop/pages/desktop_tab_page.dart')
+          text = path.read_text(encoding='utf-8')
+
+          bad = "    if (result == true && mounted) setState(() {});"
+          count = text.count(bad)
+          if count != 2:
+              raise SystemExit(f'Expected 2 invalid mounted/setState lines, found {count}')
+          text = text.replace(bad, "    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.")
+
+          old_setup = """    usernameController.dispose();\n    displayController.dispose();\n    passwordController.dispose();\n    confirmController.dispose();\n\n    if (result == true) {\n      final account = auth.currentAdmin;\n      final displayName = account?.displayName ?? 'Administrador';\n      if (isSetup) {\n        final account = await auth.login('admin', passwordController.text);\n        if (account == null) return;\n      }\n      await _restartProcess(\n        admin: true,\n        displayName: displayName,\n      );\n"""
+          new_setup = """    usernameController.dispose();\n    displayController.dispose();\n    passwordController.dispose();\n    confirmController.dispose();\n\n    if (result == true) {\n      final account = auth.currentAdmin;\n      final displayName = account?.displayName ?? 'Administrador';\n      await _restartProcess(\n        admin: true,\n        displayName: displayName,\n      );\n"""
+          if old_setup not in text:
+              raise SystemExit('Expected setup/login block was not found')
+          text = text.replace(old_setup, new_setup, 1)
+
+          path.write_text(text, encoding='utf-8')
+          print(f'Patched {path}: removed {count} invalid mounted/setState calls and fixed setup login flow.')
+
+      - name: Commit and push repair
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add flutter/lib/desktop/pages/desktop_tab_page.dart
+          git commit -m 'fix: repair AraquariDesk Flutter auth UI compile errors'
+          git push origin HEAD:${GITHUB_REF_NAME}
