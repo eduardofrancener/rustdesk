@@ -1,0 +1,86 @@
+name: AraquariDesk Runtime Fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - araquaridesk-branding
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Patch AraquariDesk runtime, auth and branding
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # 1) Only the master admin may manage TI accounts.
+          p = Path('flutter/lib/araquaridesk_auth.dart')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace(
+              "  bool get isAdmin => currentAdmin != null;\n",
+              "  bool get isAdmin => currentAdmin != null;\n  bool get isMaster => currentAdmin?.isMaster == true;\n",
+              1,
+          )
+          text = text.replace("    if (!isAdmin) return false;\n", "    if (!isMaster) return false;\n", 1)
+          text = text.replace("    if (!isAdmin) return false;\n", "    if (!isMaster) return false;\n", 1)
+          text = text.replace("    if (!isAdmin) return false;\n", "    if (!isMaster) return false;\n", 1)
+          text = text.replace("    if (!isAdmin || username.trim().toLowerCase() == 'admin') return false;\n", "    if (!isMaster || username.trim().toLowerCase() == 'admin') return false;\n", 1)
+          p.write_text(text, encoding='utf-8')
+
+          # 2) Runtime profile and fixed server settings must be reapplied after
+          # Flutter's custom-client loader, otherwise it can restore RustDesk's
+          # original outgoing profile.
+          p = Path('src/main.rs')
+          text = p.read_text(encoding='utf-8')
+          old = '''fn configure_araquaridesk() {\n    *hbb_common::config::APP_NAME.write().unwrap() = "AraquariDesk".to_owned();\n\n    hbb_common::config::Config::set_option(\n        "custom-rendezvous-server".to_owned(),\n        "jiraiya.araquari.sc.gov.br".to_owned(),\n    );\n    hbb_common::config::Config::set_option(\n        "relay-server".to_owned(),\n        "jiraiya.araquari.sc.gov.br".to_owned(),\n    );\n    hbb_common::config::Config::set_option("api-server".to_owned(), "".to_owned());\n    hbb_common::config::Config::set_option(\n        "key".to_owned(),\n        "11CvwLZ0myJrVOg2amrOhqcKC0gZD1XIiFyL6QBnt+0=".to_owned(),\n    );\n\n    // AraquariDesk starts in the safe, incoming-only profile. The authenticated\n    // TI launcher restarts the executable with --araquari-admin after a successful\n    // local login, which switches the Rust connection policy to bidirectional.\n    let is_admin = std::env::args().any(|arg| arg == "--araquari-admin");\n    {\n        let mut hard_settings = hbb_common::config::HARD_SETTINGS.write().unwrap();\n        hard_settings.insert(\n            "conn-type".to_owned(),\n            if is_admin {\n                "bidirectional".to_owned()\n            } else {\n                "incoming".to_owned()\n            },\n        );\n    }\n\n    // The existing RustDesk connection handshake already sends the local\n    // `display-name` as LoginRequest.my_name. Keep the authenticated TI name in\n    // the local config for the lifetime of the admin process and clear it for the\n    // common-user process.\n    let display_name = std::env::args()\n        .find_map(|arg| arg.strip_prefix("--araquari-display-name=").map(str::to_owned))\n        .unwrap_or_default();\n    hbb_common::config::LocalConfig::set_option(\n        "display-name".to_owned(),\n        if is_admin { display_name } else { String::new() },\n    );\n}\n'''
+          new = '''fn configure_araquaridesk() {\n    let is_admin = std::env::args().any(|arg| arg == "--araquari-admin");\n    let display_name = std::env::args()\n        .find_map(|arg| arg.strip_prefix("--araquari-display-name=").map(str::to_owned))\n        .unwrap_or_default();\n\n    fn apply_profile(is_admin: bool, display_name: &str) {\n        *hbb_common::config::APP_NAME.write().unwrap() = "AraquariDesk".to_owned();\n        hbb_common::config::Config::set_option(\n            "custom-rendezvous-server".to_owned(),\n            "jiraiya.araquari.sc.gov.br".to_owned(),\n        );\n        hbb_common::config::Config::set_option(\n            "relay-server".to_owned(),\n            "jiraiya.araquari.sc.gov.br".to_owned(),\n        );\n        hbb_common::config::Config::set_option("api-server".to_owned(), "".to_owned());\n        hbb_common::config::Config::set_option(\n            "key".to_owned(),\n            "11CvwLZ0myJrVOg2amrOhqcKC0gZD1XIiFyL6QBnt+0=".to_owned(),\n        );\n        {\n            let mut hard_settings = hbb_common::config::HARD_SETTINGS.write().unwrap();\n            hard_settings.insert(\n                "conn-type".to_owned(),\n                if is_admin {\n                    "bidirectional".to_owned()\n                } else {\n                    "incoming".to_owned()\n                },\n            );\n        }\n\n        let mut user_info: serde_json::Value =\n            serde_json::from_str(&hbb_common::config::LocalConfig::get_option("user_info"))\n                .unwrap_or_else(|_| serde_json::json!({}));\n        if let Some(obj) = user_info.as_object_mut() {\n            if is_admin && !display_name.is_empty() {\n                obj.insert(\n                    "display_name".to_owned(),\n                    serde_json::Value::String(display_name.to_owned()),\n                );\n            } else {\n                obj.remove("display_name");\n            }\n        }\n        if let Ok(serialized) = serde_json::to_string(&user_info) {\n            hbb_common::config::LocalConfig::set_option("user_info".to_owned(), serialized);\n        }\n        hbb_common::config::LocalConfig::set_option(\n            "display-name".to_owned(),\n            if is_admin { display_name.to_owned() } else { String::new() },\n        );\n    }\n\n    apply_profile(is_admin, &display_name);\n\n    // Flutter custom-client loading happens after main() on the desktop path.\n    // Re-apply the fixed profile a few times during startup so that custom.txt\n    // cannot restore outgoing access for a common user.\n    std::thread::spawn(move || {\n        for delay_ms in [400_u64, 1200, 2500] {\n            std::thread::sleep(std::time::Duration::from_millis(delay_ms));\n            apply_profile(is_admin, &display_name);\n        }\n    });\n}\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          else:
+              print('main.rs profile block already patched or source changed')
+          p.write_text(text, encoding='utf-8')
+
+          # 3) Make the main AraquariDesk SVG wordmark the actual desktop logo.
+          p = Path('flutter/lib/common.dart')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace("const _kDefaultLogoAsset = 'assets/logo.png';", "const _kDefaultLogoAsset = 'assets/brand/araquaridesk-logo.svg';", 1)
+          text = text.replace("const _kLightLogoAsset = 'assets/logo_light.png';", "const _kLightLogoAsset = 'assets/brand/araquaridesk-logo.svg';", 1)
+          text = text.replace("const _kDarkLogoAsset = 'assets/logo_dark.png';", "const _kDarkLogoAsset = 'assets/brand/araquaridesk-logo.svg';", 1)
+          old_image = '''          final image = Image.asset(\n            asset,\n            fit: BoxFit.contain,\n            errorBuilder: (ctx, error, stackTrace) {\n              return Container();\n            },\n          );'''
+          new_image = '''          final image = SvgPicture.asset(\n            asset,\n            fit: BoxFit.contain,\n          );'''
+          text = text.replace(old_image, new_image, 1)
+          p.write_text(text, encoding='utf-8')
+
+          # 4) Explicitly package the nested SVG asset.
+          p = Path('flutter/pubspec.yaml')
+          text = p.read_text(encoding='utf-8')
+          line = '    - assets/brand/araquaridesk-logo.svg\n'
+          if line not in text:
+              text = text.replace('    - assets/\n', '    - assets/\n' + line, 1)
+          p.write_text(text, encoding='utf-8')
+
+          print('AraquariDesk runtime/auth/logo patch complete')
+
+      - name: Commit
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add flutter/lib/araquaridesk_auth.dart flutter/lib/common.dart flutter/pubspec.yaml src/main.rs
+          git commit -m 'fix: enforce AraquariDesk runtime roles and branding'
+          git push origin HEAD:${GITHUB_REF_NAME}
