@@ -72,6 +72,7 @@ class AraquariDeskAuth extends ChangeNotifier {
 
   AraquariRole get role => currentAdmin == null ? AraquariRole.common : AraquariRole.admin;
   bool get isAdmin => currentAdmin != null;
+  bool get isMaster => currentAdmin?.isMaster == true;
   List<AraquariAdminAccount> get admins => List.unmodifiable(_admins);
 
   Future<File> _file() async {
@@ -245,7 +246,7 @@ class AraquariDeskAuth extends ChangeNotifier {
     required String displayName,
   }) async {
     await initialize();
-    if (!isAdmin) return false;
+    if (!isMaster) return false;
     final normalized = username.trim();
     final normalizedDisplay = displayName.trim();
     if (normalized.isEmpty || normalized.toLowerCase() == 'admin') return false;
@@ -266,7 +267,7 @@ class AraquariDeskAuth extends ChangeNotifier {
 
   Future<bool> updateDisplayName(
       String username, String displayName) async {
-    if (!isAdmin) return false;
+    if (!isMaster) return false;
     final account = _find(username);
     final normalizedDisplay = displayName.trim();
     if (account == null || normalizedDisplay.isEmpty) return false;
@@ -279,7 +280,7 @@ class AraquariDeskAuth extends ChangeNotifier {
   }
 
   Future<bool> changePassword(String username, String password) async {
-    if (!isAdmin) return false;
+    if (!isMaster) return false;
     final account = _find(username);
     if (account == null || password.isEmpty) return false;
     final replacement = _createAccount(
@@ -299,7 +300,7 @@ class AraquariDeskAuth extends ChangeNotifier {
   }
 
   Future<bool> removeAdmin(String username) async {
-    if (!isAdmin || username.trim().toLowerCase() == 'admin') return false;
+    if (!isMaster || username.trim().toLowerCase() == 'admin') return false;
     final account = _find(username);
     if (account == null) return false;
     _admins.remove(account);
