@@ -185,18 +185,19 @@ class _RoleAccessButton extends StatelessWidget {
               _logout(context);
             }
           },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: 'users',
-              child: Row(
-                children: [
-                  Icon(Icons.manage_accounts_outlined),
-                  SizedBox(width: 10),
-                  Text('Gerenciar TIs'),
-                ],
+          itemBuilder: (context) => [
+            if (auth.currentAdmin?.isMaster == true)
+              const PopupMenuItem(
+                value: 'users',
+                child: Row(
+                  children: [
+                    Icon(Icons.manage_accounts_outlined),
+                    SizedBox(width: 10),
+                    Text('Gerenciar TIs'),
+                  ],
+                ),
               ),
-            ),
-            PopupMenuItem(
+            const PopupMenuItem(
               value: 'logout',
               child: Row(
                 children: [
@@ -289,6 +290,8 @@ class _RoleAccessButton extends StatelessWidget {
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
     final isSetup = auth.setupRequired;
+    var busy = false;
+    String? error;
 
     final result = await showDialog<bool>(
       context: context,
@@ -296,8 +299,6 @@ class _RoleAccessButton extends StatelessWidget {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
-            var busy = false;
-            String? error;
             return AlertDialog(
               title: Text(isSetup ? 'Configurar acesso da TI' : 'Acesso da TI'),
               content: SizedBox(
@@ -438,6 +439,7 @@ class _RoleAccessButton extends StatelessWidget {
       final displayName = account?.displayName ?? 'Administrador';
       await _restartProcess(
         admin: true,
+        adminUser: account?.username ?? 'admin',
         displayName: displayName,
       );
     } else if (isSetup) {
@@ -604,7 +606,6 @@ class _RoleAccessButton extends StatelessWidget {
     );
     password.dispose();
     confirm.dispose();
-    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.
   }
 
   Future<void> _changeDisplayName(
@@ -631,22 +632,33 @@ class _RoleAccessButton extends StatelessWidget {
       ),
     );
     name.dispose();
-    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.
   }
 
   Future<void> _logout(BuildContext context) async {
     await _restartProcess(admin: false);
   }
 
-  Future<void> _restartProcess({required bool admin, String? displayName}) async {
+  Future<void> _restartProcess({
+    required bool admin,
+    String? adminUser,
+    String? displayName,
+  }) async {
     final args = <String>[];
+    final environment = Map<String, String>.from(Platform.environment);
     if (admin) {
       args.add('--araquari-admin');
       args.add('--araquari-display-name=${displayName ?? 'Administrador'}');
+      final user = (adminUser ?? '').trim();
+      if (user.isNotEmpty) {
+        environment['ARAQUARIDESK_ADMIN_USER'] = user;
+      }
+    } else {
+      environment.remove('ARAQUARIDESK_ADMIN_USER');
     }
     await Process.start(
       Platform.resolvedExecutable,
       args,
+      environment: environment,
       mode: ProcessStartMode.detached,
     );
     await Future<void>.delayed(const Duration(milliseconds: 250));
