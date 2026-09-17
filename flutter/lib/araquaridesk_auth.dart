@@ -74,6 +74,7 @@ class AraquariDeskAuth extends ChangeNotifier {
   bool get isAdmin => currentAdmin != null;
   bool get isMaster => currentAdmin?.isMaster == true;
   bool get isMaster => currentAdmin?.isMaster == true;
+  bool get isMaster => currentAdmin?.isMaster == true;
   List<AraquariAdminAccount> get admins => List.unmodifiable(_admins);
 
   Future<File> _file() async {
