@@ -436,10 +436,6 @@ class _RoleAccessButton extends StatelessWidget {
     if (result == true) {
       final account = auth.currentAdmin;
       final displayName = account?.displayName ?? 'Administrador';
-      if (isSetup) {
-        final account = await auth.login('admin', passwordController.text);
-        if (account == null) return;
-      }
       await _restartProcess(
         admin: true,
         displayName: displayName,
@@ -608,7 +604,7 @@ class _RoleAccessButton extends StatelessWidget {
     );
     password.dispose();
     confirm.dispose();
-    if (result == true && mounted) setState(() {});
+    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.
   }
 
   Future<void> _changeDisplayName(
@@ -635,7 +631,7 @@ class _RoleAccessButton extends StatelessWidget {
       ),
     );
     name.dispose();
-    if (result == true && mounted) setState(() {});
+    // The parent StatefulBuilder refreshes the admin-management dialog after this helper returns.
   }
 
   Future<void> _logout(BuildContext context) async {
