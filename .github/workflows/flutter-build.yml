@@ -73,29 +73,6 @@ jobs:
           syft dir:. \
             -o cyclonedx-json=rustdesk.sbom.json
 
-      - name: Prepare AraquariDesk Windows deliverables
-        if: env.UPLOAD_ARTIFACT == 'true'
-        shell: bash
-        run: |
-          cp "./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe" "./SignOutput/AraquariDesk-${{ matrix.job.arch }}.exe"
-          cp "./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi" "./SignOutput/AraquariDesk-${{ matrix.job.arch }}.msi"
-
-      - name: Upload AraquariDesk portable EXE
-        if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: AraquariDesk-portable-windows-${{ matrix.job.arch }}
-          path: ./SignOutput/AraquariDesk-${{ matrix.job.arch }}.exe
-          if-no-files-found: error
-
-      - name: Upload AraquariDesk installer MSI
-        if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: AraquariDesk-installer-windows-${{ matrix.job.arch }}
-          path: ./SignOutput/AraquariDesk-${{ matrix.job.arch }}.msi
-          if-no-files-found: error
-
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -472,6 +449,29 @@ jobs:
         shell: bash
         run: |
           BASE_URL=${{ env.SIGN_BASE_URL }} SECRET_KEY=${{ secrets.SIGN_SECRET_KEY }} python3 res/job.py sign_files ./SignOutput
+
+      - name: Prepare AraquariDesk Windows deliverables
+        if: env.UPLOAD_ARTIFACT == 'true'
+        shell: bash
+        run: |
+          cp "./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe" "./SignOutput/AraquariDesk-${{ matrix.job.arch }}.exe"
+          cp "./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi" "./SignOutput/AraquariDesk-${{ matrix.job.arch }}.msi"
+
+      - name: Upload AraquariDesk portable EXE
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: AraquariDesk-portable-windows-${{ matrix.job.arch }}
+          path: ./SignOutput/AraquariDesk-${{ matrix.job.arch }}.exe
+          if-no-files-found: error
+
+      - name: Upload AraquariDesk installer MSI
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: AraquariDesk-installer-windows-${{ matrix.job.arch }}
+          path: ./SignOutput/AraquariDesk-${{ matrix.job.arch }}.msi
+          if-no-files-found: error
 
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
