@@ -5,6 +5,7 @@
 
 use librustdesk::*;
 
+// AraquariDesk: authentication/profile state is applied by the Flutter FFI layer.
 fn configure_araquaridesk() {
     *hbb_common::config::APP_NAME.write().unwrap() = "AraquariDesk".to_owned();
 
