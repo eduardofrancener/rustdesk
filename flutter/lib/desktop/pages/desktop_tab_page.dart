@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/araquaridesk_auth.dart';
 import 'package:flutter_hbb/common.dart';
@@ -55,7 +53,11 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
         page: const _AraquariDeskHomePageGate(
           key: ValueKey(kTabLabelHomePage),
         )));
-    if (bind.isIncomingOnly()) {
+    _updateTabSelectionHandler();
+  }
+
+  void _updateTabSelectionHandler() {
+    if (!auth.isAdmin) {
       tabController.onSelected = (key) {
         if (key == kTabLabelHomePage) {
           windowManager.setSize(getIncomingOnlyHomeSize());
@@ -65,6 +67,8 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
           setResizable(true);
         }
       };
+    } else {
+      tabController.onSelected = null;
     }
   }
 
@@ -78,27 +82,38 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
   Future<void> _initializeAuth() async {
     await auth.initialize();
     if (!mounted) return;
-    _applyWindowProfile();
+    await bind.mainSetAraquarideskProfile(
+      admin: false,
+      username: '',
+    );
+    await _applyAuthenticatedRuntimeProfile();
   }
 
   void _onAuthChanged() {
     if (mounted) {
       setState(() {});
-      _applyWindowProfile();
+      _applyAuthenticatedRuntimeProfile();
     }
   }
 
   Future<void> _applyWindowProfile() async {
-    // The Rust process starts common users in incoming-only mode, so the base
-    // RustDesk UI automatically hides the outgoing pane and uses the compact
-    // layout. Admin processes are bidirectional and keep the full window.
-    if (bind.isIncomingOnly()) {
-      await windowManager.setSize(getIncomingOnlyHomeSize());
-      setResizable(false);
-    } else {
+    _updateTabSelectionHandler();
+    if (auth.isAdmin) {
       await windowManager.setSize(const Size(960, 650));
       setResizable(true);
+    } else {
+      await windowManager.setSize(getIncomingOnlyHomeSize());
+      setResizable(false);
     }
+  }
+
+  Future<void> _applyAuthenticatedRuntimeProfile() async {
+    final account = auth.currentAdmin;
+    await bind.mainSetAraquarideskProfile(
+      admin: account != null,
+      username: account?.username ?? '',
+    );
+    await _applyWindowProfile();
   }
 
   @override
@@ -377,7 +392,7 @@ class _RoleAccessButton extends StatelessWidget {
                           if (password.length < 8) {
                             setState(() {
                               busy = false;
-                              error = 'Use uma senha com pelo menos 10 caracteres.';
+                              error = 'Use uma senha com pelo menos 8 caracteres.';
                             });
                             return;
                           }
@@ -435,13 +450,7 @@ class _RoleAccessButton extends StatelessWidget {
     confirmController.dispose();
 
     if (result == true) {
-      final account = auth.currentAdmin;
-      final displayName = account?.displayName ?? 'Administrador';
-      await _restartProcess(
-        admin: true,
-        adminUser: account?.username ?? 'admin',
-        displayName: displayName,
-      );
+      await _applyAuthenticatedRuntimeProfile();
     } else if (isSetup) {
       // The setup dialog creates the account but intentionally does not leave
       // the common process in an elevated state if the restart is cancelled.
@@ -635,33 +644,11 @@ class _RoleAccessButton extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
-    await _restartProcess(admin: false);
-  }
-
-  Future<void> _restartProcess({
-    required bool admin,
-    String? adminUser,
-    String? displayName,
-  }) async {
-    final args = <String>[];
-    final environment = Map<String, String>.from(Platform.environment);
-    if (admin) {
-      args.add('--araquari-admin');
-      args.add('--araquari-display-name=${displayName ?? 'Administrador'}');
-      final user = (adminUser ?? '').trim();
-      if (user.isNotEmpty) {
-        environment['ARAQUARIDESK_ADMIN_USER'] = user;
-      }
-    } else {
-      environment.remove('ARAQUARIDESK_ADMIN_USER');
-    }
-    await Process.start(
-      Platform.resolvedExecutable,
-      args,
-      environment: environment,
-      mode: ProcessStartMode.detached,
+    await bind.mainSetAraquarideskProfile(
+      admin: false,
+      username: '',
     );
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-    exit(0);
+    auth.logout();
+    await _applyWindowProfile();
   }
 }

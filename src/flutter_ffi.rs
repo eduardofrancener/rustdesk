@@ -958,6 +958,45 @@ pub fn main_get_option(key: String) -> String {
     get_option(key)
 }
 
+pub fn main_set_araquaridesk_profile(admin: bool, username: String) {
+    {
+        let mut hard_settings = config::HARD_SETTINGS.write().unwrap();
+        hard_settings.insert(
+            "conn-type".to_owned(),
+            if admin {
+                "bidirectional".to_owned()
+            } else {
+                "incoming".to_owned()
+            },
+        );
+    }
+
+    let username = username.trim().to_owned();
+    config::LocalConfig::set_option(
+        "display-name".to_owned(),
+        username.clone(),
+    );
+
+    let mut user_info: serde_json::Value =
+        serde_json::from_str(&config::LocalConfig::get_option("user_info"))
+            .unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(obj) = user_info.as_object_mut() {
+        if admin && !username.is_empty() {
+            obj.insert(
+                "display_name".to_owned(),
+                serde_json::Value::String(username.clone()),
+            );
+        } else {
+            obj.remove("display_name");
+        }
+    }
+    if let Ok(serialized) = serde_json::to_string(&user_info) {
+        config::LocalConfig::set_option("user_info".to_owned(), serialized);
+    }
+}
+
+
+
 pub fn main_get_option_sync(key: String) -> SyncReturn<String> {
     SyncReturn(get_option(key))
 }

@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - master
+      - araquaridesk-branding
     paths-ignore:
       - ".github/**"
       - "docs/**"

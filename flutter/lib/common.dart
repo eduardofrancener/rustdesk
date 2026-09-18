@@ -2342,6 +2342,10 @@ bool handleUriLink({List<String>? cmdArgs, Uri? uri, String? uriString}) {
     }
   }
   if (type != null && id != null) {
+    if (isDesktop && !AraquariDeskAuth.instance.isAdmin) {
+      showToast(translate('Acesso disponível apenas para TI.'));
+      return false;
+    }
     switch (type) {
       case UriLinkType.remoteDesktop:
         Future.delayed(Duration.zero, () {
@@ -2533,6 +2537,10 @@ connectMainDesktop(String id,
     String? password,
     String? connToken,
     bool? isSharedPassword}) async {
+  if (isDesktop && !AraquariDeskAuth.instance.isAdmin) {
+    showToast(translate('Acesso disponível apenas para TI.'));
+    return;
+  }
   if (isFileTransfer) {
     await rustDeskWinManager.newFileTransfer(id,
         password: password,
@@ -2572,11 +2580,6 @@ connectMainDesktop(String id,
 /// If [isRDP], starts a session only for rdp.
 connect(BuildContext context, String id,
     {bool isFileTransfer = false,
-  if (isDesktop && desktopType == DesktopType.main &&
-      !AraquariDeskAuth.instance.isAdmin) {
-    showToast(translate('Acesso disponível apenas para TI.'));
-    return;
-  }
     bool isViewCamera = false,
     bool isTerminal = false,
     bool isTcpTunneling = false,
@@ -2585,6 +2588,11 @@ connect(BuildContext context, String id,
     String? password,
     String? connToken,
     bool? isSharedPassword}) async {
+  if (isDesktop && isMainDesktopWindow &&
+      !AraquariDeskAuth.instance.isAdmin) {
+    showToast(translate('Acesso disponível apenas para TI.'));
+    return;
+  }
   if (id == '') return;
   if (!isDesktop || desktopType == DesktopType.main) {
     try {
@@ -3825,14 +3833,16 @@ class _LogoState extends State<_Logo> {
 Widget loadLogo() => const _Logo();
 
 Widget loadIcon(double size) {
-  return Image.asset('assets/icon.png',
+  return SvgPicture.asset(
+    'assets/icon.svg',
+    width: size,
+    height: size,
+    errorBuilder: (ctx, error, stackTrace) => Image.asset(
+      'assets/icon.png',
       width: size,
       height: size,
-      errorBuilder: (ctx, error, stackTrace) => SvgPicture.asset(
-            'assets/icon.svg',
-            width: size,
-            height: size,
-          ));
+    ),
+  );
 }
 
 var imcomingOnlyHomeSize = Size(280, 300);
